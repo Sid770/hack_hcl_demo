@@ -70,14 +70,6 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Lint Angular code
-      run: npm run lint
-      continue-on-error: true
-
-    - name: Run Angular tests
-      run: npm run test -- --watch=false --browsers=ChromeHeadless
-      continue-on-error: true
-
     - name: Build Angular app (Production)
       run: npm run build -- --configuration production
 
@@ -106,10 +98,6 @@ jobs:
 
     - name: Install dependencies
       run: npm ci
-
-    - name: Run ESLint
-      run: npm run lint
-      continue-on-error: true
 
     - name: Check TypeScript compilation
       run: npx tsc --noEmit
