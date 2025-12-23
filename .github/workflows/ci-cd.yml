@@ -131,7 +131,7 @@ jobs:
     name: Deploy to DEV
     needs: [backend-build-test, frontend-build-test]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && github.event_name == 'push'
     environment:
       name: development
       url: https://dev-ticket-system.example.com
@@ -168,7 +168,7 @@ jobs:
     name: Deploy to STAGING
     needs: [backend-build-test, frontend-build-test, code-quality, security-scan]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && github.event_name == 'push'
     environment:
       name: staging
       url: https://staging-ticket-system.example.com
