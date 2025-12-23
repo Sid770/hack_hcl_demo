@@ -1,0 +1,17 @@
+*.swp
+*.bak
+*.tmp
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.log
+bin/
+obj/
+.vs/
+.vscode/
+*.db
+*.db-shm
+*.db-wal

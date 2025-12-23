@@ -1,0 +1,155 @@
+@if (ticket()) {
+  <div class="detail-container">
+    <!-- Header -->
+    <div class="detail-header">
+      <div class="header-content">
+        <div class="ticket-meta">
+          <span class="ticket-id">#{{ ticket()!.id }}</span>
+          <span class="badge" [class]="getStatusClass(ticket()!.status)">
+            {{ ticket()!.status }}
+          </span>
+          <span class="badge" [class]="getPriorityClass(ticket()!.priority)">
+            {{ ticket()!.priority }}
+          </span>
+        </div>
+        <h1>{{ ticket()!.title }}</h1>
+        <div class="meta-info">
+          <span>📂 {{ ticket()!.category }}</span>
+          <span>👤 Reported by: {{ ticket()!.reportedBy }}</span>
+          <span>👨‍💼 Assigned to: {{ ticket()!.assignedTo }}</span>
+          <span>📅 Created: {{ ticket()!.createdAt | date: 'medium' }}</span>
+          <span>🔄 Updated: {{ ticket()!.updatedAt | date: 'medium' }}</span>
+          @if (ticket()!.resolvedAt) {
+            <span>✅ Resolved: {{ ticket()!.resolvedAt | date: 'medium' }}</span>
+          }
+        </div>
+      </div>
+      <div class="header-actions">
+        <a [routerLink]="['/tickets', ticket()!.id, 'edit']" class="btn btn-primary">
+          <span class="btn-icon">✏️</span>
+          Edit
+        </a>
+        <button (click)="deleteTicket()" class="btn btn-danger">
+          <span class="btn-icon">🗑️</span>
+          Delete
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="detail-content">
+      <!-- Description -->
+      <div class="content-card">
+        <h2>Description</h2>
+        <div class="description-text">
+          {{ ticket()!.description }}
+        </div>
+      </div>
+
+      <!-- Comments Section -->
+      <div class="content-card">
+        <h2>Comments ({{ ticket()!.comments.length }})</h2>
+        
+        <!-- Add Comment Form -->
+        <div class="add-comment-section">
+          <h3>Add a Comment</h3>
+          <div class="comment-form">
+            <input
+              type="text"
+              class="form-input"
+              placeholder="Your name"
+              [value]="commentAuthor()"
+              (input)="updateCommentAuthor($any($event.target).value)"
+            />
+            <textarea
+              class="form-textarea"
+              placeholder="Write your comment here..."
+              rows="3"
+              [value]="newComment()"
+              (input)="updateCommentText($any($event.target).value)"
+            ></textarea>
+            <button (click)="addComment()" class="btn btn-primary">
+              <span class="btn-icon">💬</span>
+              Add Comment
+            </button>
+          </div>
+        </div>
+
+        <!-- Comments List -->
+        @if (ticket()!.comments.length === 0) {
+          <div class="no-comments">
+            <p>No comments yet. Be the first to comment!</p>
+          </div>
+        } @else {
+          <div class="comments-list">
+            @for (comment of ticket()!.comments; track comment.id) {
+              <div class="comment-item">
+                <div class="comment-header">
+                  <div class="comment-author">
+                    <span class="author-avatar">👤</span>
+                    <strong>{{ comment.author }}</strong>
+                  </div>
+                  <span class="comment-date">
+                    {{ comment.createdAt | date: 'medium' }}
+                  </span>
+                </div>
+                <div class="comment-text">
+                  {{ comment.text }}
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Ticket Timeline -->
+      <div class="content-card">
+        <h2>Timeline</h2>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <strong>Ticket Created</strong>
+              <p>by {{ ticket()!.reportedBy }}</p>
+              <span class="timeline-date">{{ ticket()!.createdAt | date: 'medium' }}</span>
+            </div>
+          </div>
+          
+          @if (ticket()!.updatedAt.getTime() !== ticket()!.createdAt.getTime()) {
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-content">
+                <strong>Ticket Updated</strong>
+                <span class="timeline-date">{{ ticket()!.updatedAt | date: 'medium' }}</span>
+              </div>
+            </div>
+          }
+          
+          @if (ticket()!.resolvedAt) {
+            <div class="timeline-item">
+              <div class="timeline-dot resolved"></div>
+              <div class="timeline-content">
+                <strong>Ticket Resolved</strong>
+                <span class="timeline-date">{{ ticket()!.resolvedAt | date: 'medium' }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Navigation -->
+    <div class="detail-footer">
+      <a routerLink="/tickets" class="btn btn-secondary">
+        ← Back to Tickets
+      </a>
+      <a routerLink="/" class="btn btn-secondary">
+        🏠 Dashboard
+      </a>
+    </div>
+  </div>
+} @else {
+  <div class="loading-state">
+    <p>Loading ticket...</p>
+  </div>
+}

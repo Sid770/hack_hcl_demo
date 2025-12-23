@@ -1,0 +1,274 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '18.x'
+  ANGULAR_PROJECT_PATH: '.'
+  API_PROJECT_PATH: './TicketManagementAPI'
+
+jobs:
+  # Job 1: Build and Test Backend (.NET API)
+  backend-build-test:
+    name: Backend - Build & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: ${{ env.API_PROJECT_PATH }}
+
+    - name: Build API
+      run: dotnet build --configuration Release --no-restore
+      working-directory: ${{ env.API_PROJECT_PATH }}
+
+    - name: Run tests (if any)
+      run: dotnet test --no-build --configuration Release --verbosity normal
+      working-directory: ${{ env.API_PROJECT_PATH }}
+      continue-on-error: true
+
+    - name: Publish API
+      run: dotnet publish --configuration Release --output ./publish --no-build
+      working-directory: ${{ env.API_PROJECT_PATH }}
+
+    - name: Upload API artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-build
+        path: ${{ env.API_PROJECT_PATH }}/publish
+        retention-days: 7
+
+  # Job 2: Build and Test Frontend (Angular)
+  frontend-build-test:
+    name: Frontend - Build & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Lint Angular code
+      run: npm run lint
+      continue-on-error: true
+
+    - name: Run Angular tests
+      run: npm run test -- --watch=false --browsers=ChromeHeadless
+      continue-on-error: true
+
+    - name: Build Angular app (Production)
+      run: npm run build -- --configuration production
+
+    - name: Upload Angular artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: angular-build
+        path: dist/
+        retention-days: 7
+
+  # Job 3: Code Quality Check
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run ESLint
+      run: npm run lint
+      continue-on-error: true
+
+    - name: Check TypeScript compilation
+      run: npx tsc --noEmit
+      continue-on-error: true
+
+  # Job 4: Security Scan
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run npm audit
+      run: npm audit --production
+      continue-on-error: true
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Check .NET vulnerabilities
+      run: dotnet list package --vulnerable --include-transitive
+      working-directory: ${{ env.API_PROJECT_PATH }}
+      continue-on-error: true
+
+  # Job 5: Deploy to Development (Auto-deploy on develop branch)
+  deploy-dev:
+    name: Deploy to DEV
+    needs: [backend-build-test, frontend-build-test]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment:
+      name: development
+      url: https://dev-ticket-system.example.com
+    
+    steps:
+    - name: Download API artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: api-build
+        path: ./api-deploy
+
+    - name: Download Angular artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: angular-build
+        path: ./angular-deploy
+
+    - name: Deploy to DEV environment
+      run: |
+        echo "🚀 Deploying to DEV environment..."
+        echo "API artifacts ready in ./api-deploy"
+        echo "Angular artifacts ready in ./angular-deploy"
+        # Add your deployment commands here
+        # Example: scp, rsync, Azure CLI, AWS CLI, etc.
+        
+    - name: Run smoke tests
+      run: |
+        echo "🧪 Running smoke tests..."
+        # Add smoke test commands here
+        # Example: curl health check endpoints
+
+  # Job 6: Deploy to Staging (Manual approval for main branch)
+  deploy-staging:
+    name: Deploy to STAGING
+    needs: [backend-build-test, frontend-build-test, code-quality, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://staging-ticket-system.example.com
+    
+    steps:
+    - name: Download API artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: api-build
+        path: ./api-deploy
+
+    - name: Download Angular artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: angular-build
+        path: ./angular-deploy
+
+    - name: Deploy to STAGING environment
+      run: |
+        echo "🚀 Deploying to STAGING environment..."
+        echo "API artifacts ready in ./api-deploy"
+        echo "Angular artifacts ready in ./angular-deploy"
+        # Add your deployment commands here
+        
+    - name: Run integration tests
+      run: |
+        echo "🧪 Running integration tests..."
+        # Add integration test commands here
+
+  # Job 7: Deploy to Production (Manual trigger only)
+  deploy-production:
+    name: Deploy to PRODUCTION
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+      url: https://ticket-system.example.com
+    
+    steps:
+    - name: Download API artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: api-build
+        path: ./api-deploy
+
+    - name: Download Angular artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: angular-build
+        path: ./angular-deploy
+
+    - name: Deploy to PRODUCTION environment
+      run: |
+        echo "🚀 Deploying to PRODUCTION environment..."
+        echo "API artifacts ready in ./api-deploy"
+        echo "Angular artifacts ready in ./angular-deploy"
+        # Add your production deployment commands here
+        
+    - name: Verify deployment
+      run: |
+        echo "✅ Verifying production deployment..."
+        # Add verification commands here
+
+    - name: Send deployment notification
+      run: |
+        echo "📧 Sending deployment notification..."
+        # Add notification commands (Slack, email, etc.)
+
+  # Job 8: Build Summary
+  build-summary:
+    name: Build Summary
+    needs: [backend-build-test, frontend-build-test, code-quality, security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Generate build summary
+      run: |
+        echo "## 📊 Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Results:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Backend Build: ${{ needs.backend-build-test.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Frontend Build: ${{ needs.frontend-build-test.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Security Scan: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Build Information:" >> $GITHUB_STEP_SUMMARY
+        echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

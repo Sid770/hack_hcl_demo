@@ -1,0 +1,129 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>Enterprise Ticket Management System</h1>
+    <p class="subtitle">Centralized ticket tracking and management</p>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-grid">
+    <div class="stat-card total">
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <h3>{{ stats().total }}</h3>
+        <p>Total Tickets</p>
+      </div>
+    </div>
+
+    <div class="stat-card open">
+      <div class="stat-icon">🎫</div>
+      <div class="stat-content">
+        <h3>{{ stats().open }}</h3>
+        <p>Open Tickets</p>
+      </div>
+    </div>
+
+    <div class="stat-card progress">
+      <div class="stat-icon">⚙️</div>
+      <div class="stat-content">
+        <h3>{{ stats().inProgress }}</h3>
+        <p>In Progress</p>
+      </div>
+    </div>
+
+    <div class="stat-card resolved">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <h3>{{ stats().resolved }}</h3>
+        <p>Resolved</p>
+      </div>
+    </div>
+
+    <div class="stat-card closed">
+      <div class="stat-icon">🔒</div>
+      <div class="stat-content">
+        <h3>{{ stats().closed }}</h3>
+        <p>Closed</p>
+      </div>
+    </div>
+
+    <div class="stat-card priority">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-content">
+        <h3>{{ stats().highPriority }}</h3>
+        <p>High Priority</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions">
+    <h2>Quick Actions</h2>
+    <div class="action-buttons">
+      <a routerLink="/tickets/new" class="btn btn-primary">
+        <span class="btn-icon">➕</span>
+        Create New Ticket
+      </a>
+      <a routerLink="/tickets" class="btn btn-secondary">
+        <span class="btn-icon">📋</span>
+        View All Tickets
+      </a>
+    </div>
+  </div>
+
+  <!-- Recent Tickets -->
+  <div class="recent-tickets">
+    <div class="section-header">
+      <h2>Recent Tickets</h2>
+      <a routerLink="/tickets" class="view-all-link">View All →</a>
+    </div>
+
+    @if (recentTickets().length === 0) {
+      <div class="empty-state">
+        <p>No tickets available</p>
+      </div>
+    } @else {
+      <div class="tickets-table">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Assigned To</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ticket of recentTickets(); track ticket.id) {
+              <tr>
+                <td class="ticket-id">#{{ ticket.id }}</td>
+                <td class="ticket-title">{{ ticket.title }}</td>
+                <td>
+                  <span class="badge badge-category">{{ ticket.category }}</span>
+                </td>
+                <td>
+                  <span class="badge" [class]="getPriorityClass(ticket.priority)">
+                    {{ ticket.priority }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge" [class]="getStatusClass(ticket.status)">
+                    {{ ticket.status }}
+                  </span>
+                </td>
+                <td>{{ ticket.assignedTo }}</td>
+                <td>{{ ticket.createdAt | date: 'short' }}</td>
+                <td>
+                  <a [routerLink]="['/tickets', ticket.id]" class="btn-link">View</a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

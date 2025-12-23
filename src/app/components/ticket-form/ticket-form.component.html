@@ -1,0 +1,153 @@
+<div class="form-container">
+  <div class="form-header">
+    <h1>{{ isEditMode() ? 'Edit Ticket' : 'Create New Ticket' }}</h1>
+    <p class="subtitle">
+      {{ isEditMode() ? 'Update ticket information' : 'Fill in the details to create a new support ticket' }}
+    </p>
+  </div>
+
+  <div class="form-card">
+    <form (ngSubmit)="onSubmit()">
+      <!-- Title -->
+      <div class="form-group">
+        <label for="title" class="form-label">
+          Title <span class="required">*</span>
+        </label>
+        <input
+          type="text"
+          id="title"
+          class="form-input"
+          [class.error]="errors()['title']"
+          [value]="formData().title"
+          (input)="updateField('title', $any($event.target).value)"
+          placeholder="Enter ticket title"
+        />
+        @if (errors()['title']) {
+          <span class="error-message">{{ errors()['title'] }}</span>
+        }
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description" class="form-label">
+          Description <span class="required">*</span>
+        </label>
+        <textarea
+          id="description"
+          class="form-textarea"
+          [class.error]="errors()['description']"
+          [value]="formData().description"
+          (input)="updateField('description', $any($event.target).value)"
+          placeholder="Provide detailed description of the issue"
+          rows="5"
+        ></textarea>
+        @if (errors()['description']) {
+          <span class="error-message">{{ errors()['description'] }}</span>
+        }
+      </div>
+
+      <!-- Category and Priority Row -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="category" class="form-label">Category</label>
+          <select
+            id="category"
+            class="form-select"
+            [value]="formData().category"
+            (change)="updateField('category', $any($event.target).value)"
+          >
+            @for (category of categoryOptions; track category) {
+              <option [value]="category">{{ category }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="priority" class="form-label">Priority</label>
+          <select
+            id="priority"
+            class="form-select"
+            [value]="formData().priority"
+            (change)="updateField('priority', $any($event.target).value)"
+          >
+            @for (priority of priorityOptions; track priority) {
+              <option [value]="priority">{{ priority }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <!-- Status (only in edit mode) -->
+      @if (isEditMode()) {
+        <div class="form-group">
+          <label for="status" class="form-label">Status</label>
+          <select
+            id="status"
+            class="form-select"
+            [value]="formData().status"
+            (change)="updateField('status', $any($event.target).value)"
+          >
+            @for (status of statusOptions; track status) {
+              <option [value]="status">{{ status }}</option>
+            }
+          </select>
+        </div>
+      }
+
+      <!-- Assigned To and Reported By Row -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="assignedTo" class="form-label">
+            Assigned To <span class="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="assignedTo"
+            class="form-input"
+            [class.error]="errors()['assignedTo']"
+            [value]="formData().assignedTo"
+            (input)="updateField('assignedTo', $any($event.target).value)"
+            placeholder="Enter assignee name"
+          />
+          @if (errors()['assignedTo']) {
+            <span class="error-message">{{ errors()['assignedTo'] }}</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="reportedBy" class="form-label">
+            Reported By <span class="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="reportedBy"
+            class="form-input"
+            [class.error]="errors()['reportedBy']"
+            [value]="formData().reportedBy"
+            (input)="updateField('reportedBy', $any($event.target).value)"
+            placeholder="Enter reporter name"
+          />
+          @if (errors()['reportedBy']) {
+            <span class="error-message">{{ errors()['reportedBy'] }}</span>
+          }
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          <span class="btn-icon">💾</span>
+          {{ isEditMode() ? 'Update Ticket' : 'Create Ticket' }}
+        </button>
+        <button type="button" (click)="onCancel()" class="btn btn-secondary">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Back Link -->
+  <div class="back-link">
+    <a routerLink="/tickets">← Back to Tickets List</a>
+  </div>
+</div>
