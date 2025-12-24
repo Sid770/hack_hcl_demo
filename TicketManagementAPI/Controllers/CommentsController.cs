@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TicketManagementAPI.Data;
 using TicketManagementAPI.Models;
 
@@ -9,12 +9,12 @@ namespace TicketManagementAPI.Controllers
     [ApiController]
     public class CommentsController : ControllerBase
     {
-        private readonly TicketDbContext _context;
+        private readonly MongoDbService _mongoDbService;
         private readonly ILogger<CommentsController> _logger;
 
-        public CommentsController(TicketDbContext context, ILogger<CommentsController> logger)
+        public CommentsController(MongoDbService mongoDbService, ILogger<CommentsController> logger)
         {
-            _context = context;
+            _mongoDbService = mongoDbService;
             _logger = logger;
         }
 
@@ -24,9 +24,10 @@ namespace TicketManagementAPI.Controllers
         {
             try
             {
-                var comments = await _context.Comments
-                    .Where(c => c.TicketId == ticketId)
-                    .OrderBy(c => c.CreatedAt)
+                // Get comments from the Comments collection
+                var comments = await _mongoDbService.Comments
+                    .Find(c => c.TicketId == ticketId)
+                    .SortBy(c => c.CreatedAt)
                     .ToListAsync();
 
                 return Ok(comments);
@@ -50,25 +51,24 @@ namespace TicketManagementAPI.Controllers
                 }
 
                 // Verify ticket exists
-                var ticketExists = await _context.Tickets.AnyAsync(t => t.Id == comment.TicketId);
-                if (!ticketExists)
+                var ticket = await _mongoDbService.Tickets
+                    .Find(t => t.Id == comment.TicketId)
+                    .FirstOrDefaultAsync();
+                    
+                if (ticket == null)
                 {
                     return NotFound(new { message = "Ticket not found" });
                 }
 
-                comment.Id = Guid.NewGuid().ToString();
                 comment.CreatedAt = DateTime.UtcNow;
 
-                _context.Comments.Add(comment);
+                // Insert comment into Comments collection
+                await _mongoDbService.Comments.InsertOneAsync(comment);
 
-                // Update ticket's UpdatedAt
-                var ticket = await _context.Tickets.FindAsync(comment.TicketId);
-                if (ticket != null)
-                {
-                    ticket.UpdatedAt = DateTime.UtcNow;
-                }
-
-                await _context.SaveChangesAsync();
+                // Also add comment to ticket's Comments array
+                ticket.Comments.Add(comment);
+                ticket.UpdatedAt = DateTime.UtcNow;
+                await _mongoDbService.Tickets.ReplaceOneAsync(t => t.Id == ticket.Id, ticket);
 
                 return CreatedAtAction(nameof(GetCommentsByTicket), 
                     new { ticketId = comment.TicketId }, comment);
@@ -86,14 +86,28 @@ namespace TicketManagementAPI.Controllers
         {
             try
             {
-                var comment = await _context.Comments.FindAsync(id);
+                var comment = await _mongoDbService.Comments
+                    .Find(c => c.Id == id)
+                    .FirstOrDefaultAsync();
+                    
                 if (comment == null)
                 {
                     return NotFound(new { message = "Comment not found" });
                 }
 
-                _context.Comments.Remove(comment);
-                await _context.SaveChangesAsync();
+                // Delete from Comments collection
+                await _mongoDbService.Comments.DeleteOneAsync(c => c.Id == id);
+
+                // Also remove from ticket's Comments array
+                var ticket = await _mongoDbService.Tickets
+                    .Find(t => t.Id == comment.TicketId)
+                    .FirstOrDefaultAsync();
+                    
+                if (ticket != null)
+                {
+                    ticket.Comments.RemoveAll(c => c.Id == id);
+                    await _mongoDbService.Tickets.ReplaceOneAsync(t => t.Id == ticket.Id, ticket);
+                }
 
                 return NoContent();
             }

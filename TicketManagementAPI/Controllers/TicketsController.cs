@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TicketManagementAPI.Data;
 using TicketManagementAPI.Models;
 
@@ -9,12 +9,12 @@ namespace TicketManagementAPI.Controllers
     [ApiController]
     public class TicketsController : ControllerBase
     {
-        private readonly TicketDbContext _context;
+        private readonly MongoDbService _mongoDbService;
         private readonly ILogger<TicketsController> _logger;
 
-        public TicketsController(TicketDbContext context, ILogger<TicketsController> logger)
+        public TicketsController(MongoDbService mongoDbService, ILogger<TicketsController> logger)
         {
-            _context = context;
+            _mongoDbService = mongoDbService;
             _logger = logger;
         }
 
@@ -24,9 +24,9 @@ namespace TicketManagementAPI.Controllers
         {
             try
             {
-                var tickets = await _context.Tickets
-                    .Include(t => t.Comments)
-                    .OrderByDescending(t => t.CreatedAt)
+                var tickets = await _mongoDbService.Tickets
+                    .Find(_ => true)
+                    .SortByDescending(t => t.CreatedAt)
                     .ToListAsync();
                 return Ok(tickets);
             }
@@ -43,9 +43,9 @@ namespace TicketManagementAPI.Controllers
         {
             try
             {
-                var ticket = await _context.Tickets
-                    .Include(t => t.Comments)
-                    .FirstOrDefaultAsync(t => t.Id == id);
+                var ticket = await _mongoDbService.Tickets
+                    .Find(t => t.Id == id)
+                    .FirstOrDefaultAsync();
 
                 if (ticket == null)
                 {
@@ -67,7 +67,7 @@ namespace TicketManagementAPI.Controllers
         {
             try
             {
-                var tickets = await _context.Tickets.ToListAsync();
+                var tickets = await _mongoDbService.Tickets.Find(_ => true).ToListAsync();
 
                 var stats = new TicketStats
                 {
@@ -99,13 +99,16 @@ namespace TicketManagementAPI.Controllers
                     return await GetTickets();
                 }
 
-                var tickets = await _context.Tickets
-                    .Include(t => t.Comments)
-                    .Where(t => t.Title.Contains(term) ||
-                               t.Description.Contains(term) ||
-                               t.AssignedTo.Contains(term) ||
-                               t.ReportedBy.Contains(term))
-                    .OrderByDescending(t => t.CreatedAt)
+                var filter = Builders<Ticket>.Filter.Or(
+                    Builders<Ticket>.Filter.Regex(t => t.Title, new MongoDB.Bson.BsonRegularExpression(term, "i")),
+                    Builders<Ticket>.Filter.Regex(t => t.Description, new MongoDB.Bson.BsonRegularExpression(term, "i")),
+                    Builders<Ticket>.Filter.Regex(t => t.AssignedTo, new MongoDB.Bson.BsonRegularExpression(term, "i")),
+                    Builders<Ticket>.Filter.Regex(t => t.ReportedBy, new MongoDB.Bson.BsonRegularExpression(term, "i"))
+                );
+
+                var tickets = await _mongoDbService.Tickets
+                    .Find(filter)
+                    .SortByDescending(t => t.CreatedAt)
                     .ToListAsync();
 
                 return Ok(tickets);
@@ -128,13 +131,11 @@ namespace TicketManagementAPI.Controllers
                     return BadRequest(ModelState);
                 }
 
-                ticket.Id = Guid.NewGuid().ToString();
                 ticket.CreatedAt = DateTime.UtcNow;
                 ticket.UpdatedAt = DateTime.UtcNow;
                 ticket.Comments = new List<Comment>();
 
-                _context.Tickets.Add(ticket);
-                await _context.SaveChangesAsync();
+                await _mongoDbService.Tickets.InsertOneAsync(ticket);
 
                 return CreatedAtAction(nameof(GetTicket), new { id = ticket.Id }, ticket);
             }
@@ -156,27 +157,28 @@ namespace TicketManagementAPI.Controllers
                     return BadRequest(new { message = "ID mismatch" });
                 }
 
-                var existingTicket = await _context.Tickets.FindAsync(id);
+                var existingTicket = await _mongoDbService.Tickets
+                    .Find(t => t.Id == id)
+                    .FirstOrDefaultAsync();
+                    
                 if (existingTicket == null)
                 {
                     return NotFound(new { message = "Ticket not found" });
                 }
 
-                existingTicket.Title = ticket.Title;
-                existingTicket.Description = ticket.Description;
-                existingTicket.Category = ticket.Category;
-                existingTicket.Priority = ticket.Priority;
-                existingTicket.Status = ticket.Status;
-                existingTicket.AssignedTo = ticket.AssignedTo;
-                existingTicket.ReportedBy = ticket.ReportedBy;
-                existingTicket.UpdatedAt = DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.UtcNow;
+                ticket.CreatedAt = existingTicket.CreatedAt;
 
                 if (ticket.Status == "Resolved" && existingTicket.ResolvedAt == null)
                 {
-                    existingTicket.ResolvedAt = DateTime.UtcNow;
+                    ticket.ResolvedAt = DateTime.UtcNow;
+                }
+                else if (ticket.Status != "Resolved")
+                {
+                    ticket.ResolvedAt = existingTicket.ResolvedAt;
                 }
 
-                await _context.SaveChangesAsync();
+                await _mongoDbService.Tickets.ReplaceOneAsync(t => t.Id == id, ticket);
 
                 return NoContent();
             }
@@ -193,14 +195,15 @@ namespace TicketManagementAPI.Controllers
         {
             try
             {
-                var ticket = await _context.Tickets.FindAsync(id);
-                if (ticket == null)
+                var result = await _mongoDbService.Tickets.DeleteOneAsync(t => t.Id == id);
+                
+                if (result.DeletedCount == 0)
                 {
                     return NotFound(new { message = "Ticket not found" });
                 }
 
-                _context.Tickets.Remove(ticket);
-                await _context.SaveChangesAsync();
+                // Also delete associated comments
+                await _mongoDbService.Comments.DeleteManyAsync(c => c.TicketId == id);
 
                 return NoContent();
             }

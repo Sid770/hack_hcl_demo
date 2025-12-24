@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using TicketManagementAPI.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,19 +22,8 @@ builder.Services.AddCors(options =>
         });
 });
 
-// Configure Database
-var databaseProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
-
-if (databaseProvider == "SqlServer")
-{
-    builder.Services.AddDbContext<TicketDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServerConnection")));
-}
-else
-{
-    builder.Services.AddDbContext<TicketDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
-}
+// Configure MongoDB
+builder.Services.AddSingleton<MongoDbService>();
 
 // Add Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -45,20 +33,20 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Ticket Management API",
         Version = "v1",
-        Description = "Enterprise Ticket Management System API"
+        Description = "Enterprise Ticket Management System API with MongoDB"
     });
 });
 
 var app = builder.Build();
 
-// Ensure database is created and seeded
+// Seed MongoDB data
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<TicketDbContext>();
+    var mongoDbService = scope.ServiceProvider.GetRequiredService<MongoDbService>();
     try
     {
-        context.Database.EnsureCreated();
-        Console.WriteLine("Database initialized successfully");
+        await mongoDbService.SeedDataAsync();
+        Console.WriteLine("MongoDB database initialized successfully");
     }
     catch (Exception ex)
     {

@@ -1,39 +1,37 @@
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TicketManagementAPI.Models;
 
 namespace TicketManagementAPI.Data
 {
-    public class TicketDbContext : DbContext
+    public class MongoDbService
     {
-        public TicketDbContext(DbContextOptions<TicketDbContext> options) : base(options)
+        private readonly IMongoDatabase _database;
+
+        public MongoDbService(IConfiguration configuration)
         {
+            var connectionString = configuration.GetConnectionString("MongoDbConnection");
+            var databaseName = configuration["MongoDbSettings:DatabaseName"];
+            
+            var client = new MongoClient(connectionString);
+            _database = client.GetDatabase(databaseName);
         }
 
-        public DbSet<Ticket> Tickets { get; set; }
-        public DbSet<Comment> Comments { get; set; }
+        public IMongoCollection<Ticket> Tickets => _database.GetCollection<Ticket>("Tickets");
+        public IMongoCollection<Comment> Comments => _database.GetCollection<Comment>("Comments");
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        public async Task SeedDataAsync()
         {
-            base.OnModelCreating(modelBuilder);
+            // Check if data already exists
+            var ticketCount = await Tickets.CountDocumentsAsync(FilterDefinition<Ticket>.Empty);
+            if (ticketCount > 0)
+            {
+                return; // Data already seeded
+            }
 
-            // Configure relationships
-            modelBuilder.Entity<Ticket>()
-                .HasMany(t => t.Comments)
-                .WithOne(c => c.Ticket)
-                .HasForeignKey(c => c.TicketId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Seed initial data
-            SeedData(modelBuilder);
-        }
-
-        private void SeedData(ModelBuilder modelBuilder)
-        {
             var tickets = new[]
             {
                 new Ticket
                 {
-                    Id = "1",
                     Title = "Login page not working",
                     Description = "Users are unable to login to the system. Getting 500 error.",
                     Category = "Bug",
@@ -46,7 +44,6 @@ namespace TicketManagementAPI.Data
                 },
                 new Ticket
                 {
-                    Id = "2",
                     Title = "Add export functionality",
                     Description = "Need ability to export tickets to CSV format.",
                     Category = "Feature Request",
@@ -59,7 +56,6 @@ namespace TicketManagementAPI.Data
                 },
                 new Ticket
                 {
-                    Id = "3",
                     Title = "Billing discrepancy",
                     Description = "Customer charged twice for the same service.",
                     Category = "Billing",
@@ -73,7 +69,6 @@ namespace TicketManagementAPI.Data
                 },
                 new Ticket
                 {
-                    Id = "4",
                     Title = "How to reset password?",
                     Description = "User needs help resetting their password.",
                     Category = "General",
@@ -87,7 +82,6 @@ namespace TicketManagementAPI.Data
                 },
                 new Ticket
                 {
-                    Id = "5",
                     Title = "Server performance issues",
                     Description = "API response time is very slow during peak hours.",
                     Category = "Technical",
@@ -97,32 +91,22 @@ namespace TicketManagementAPI.Data
                     ReportedBy = "System Monitor",
                     CreatedAt = DateTime.UtcNow.AddDays(-2),
                     UpdatedAt = DateTime.UtcNow
-                }
-            };
-
-            modelBuilder.Entity<Ticket>().HasData(tickets);
-
-            var comments = new[]
-            {
-                new Comment
-                {
-                    Id = "c1",
-                    TicketId = "2",
-                    Author = "Mike Johnson",
-                    Text = "Working on implementation",
-                    CreatedAt = DateTime.UtcNow.AddDays(-1)
                 },
-                new Comment
+                new Ticket
                 {
-                    Id = "c2",
-                    TicketId = "3",
-                    Author = "Emily Davis",
-                    Text = "Refund processed",
-                    CreatedAt = DateTime.UtcNow.AddDays(-1)
+                    Title = "Improve dashboard UI",
+                    Description = "Dashboard layout needs to be more intuitive and user-friendly.",
+                    Category = "Enhancement",
+                    Priority = "Medium",
+                    Status = "Open",
+                    AssignedTo = "UI Team",
+                    ReportedBy = "Product Manager",
+                    CreatedAt = DateTime.UtcNow.AddDays(-1),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-1)
                 }
             };
 
-            modelBuilder.Entity<Comment>().HasData(comments);
+            await Tickets.InsertManyAsync(tickets);
         }
     }
 }
